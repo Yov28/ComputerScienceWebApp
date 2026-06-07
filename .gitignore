@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 instance/
 static/uploads/*
+.env
+.DS_Store
+*.db
