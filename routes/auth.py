@@ -19,7 +19,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        username = request.form.get('username', '').strip().lower()
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
