@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Attempt — {{ attempt.user.full_name }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <a href="{{ url_for('teacher.student_detail', student_id=attempt.user.id) }}" class="back-link">← {{ attempt.user.full_name }}</a>
+
+  <div class="page-header-row page-header">
+    <div>
+      <h1>{{ attempt.week.title }}</h1>
+      <p>{{ attempt.user.full_name }} · {{ attempt.completed_at.strftime('%d %b %Y at %H:%M') }}</p>
+    </div>
+    <div style="text-align:right;">
+      {% set colour = 'var(--accent)' if pct >= 70 else ('var(--amber)' if pct >= 50 else 'var(--red)') %}
+      <div style="font-size:36px; font-weight:700; color:{{ colour }};">{{ pct }}%</div>
+      <div style="font-size:14px; color:var(--text-muted);">{{ attempt.score }} / {{ attempt.total }} correct</div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom:28px;">
+    <div class="stat-card"><div class="stat-label">Correct</div><div class="stat-val green">{{ attempt.score }}</div></div>
+    <div class="stat-card"><div class="stat-label">Wrong</div><div class="stat-val red">{{ attempt.total - attempt.score }}</div></div>
+    <div class="stat-card"><div class="stat-label">Score</div><div class="stat-val" style="color:{{ colour }};">{{ pct }}%</div></div>
+    <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-val">{{ attempt.total }}</div></div>
+  </div>
+
+  <div class="section-title">Question-by-question breakdown</div>
+
+  {% set sections = questions | groupby('section') %}
+  {% for section, qs in sections %}
+    {% if section %}<div style="font-size:13px; color:var(--blue); font-weight:600; margin:20px 0 10px;">{{ section }}</div>{% endif %}
+    {% for q in qs %}
+      {% set ans = answers.get(q.id) %}
+      {% set is_correct = ans.is_correct if ans else false %}
+      <div class="card-sm" style="margin-bottom:10px; border-left:3px solid {% if is_correct %}var(--accent){% else %}var(--red){% endif %}; padding-left:16px;">
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <span style="font-size:18px; flex-shrink:0;">{% if is_correct %}✅{% else %}❌{% endif %}</span>
+          <div style="flex:1;">
+            <div style="font-size:14px; font-weight:500; margin-bottom:8px;">{{ q.text }}</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+              {% for opt in q.options %}
+              <span style="font-size:12px; padding:3px 10px; border-radius:99px;
+                background:{% if opt.is_correct %}var(--accent-dim){% elif ans and ans.option_id == opt.id %}var(--red-dim){% else %}var(--surface2){% endif %};
+                color:{% if opt.is_correct %}var(--accent){% elif ans and ans.option_id == opt.id %}var(--red){% else %}var(--text-faint){% endif %};
+                border:1px solid {% if opt.is_correct %}rgba(74,222,128,0.3){% elif ans and ans.option_id == opt.id %}rgba(248,113,113,0.3){% else %}var(--border){% endif %};">
+                {{ opt.text }}{% if opt.is_correct %} ✓{% endif %}{% if ans and ans.option_id == opt.id and not opt.is_correct %} ← student{% endif %}
+              </span>
+              {% endfor %}
+            </div>
+            {% if q.explanation %}<div style="font-size:13px; color:var(--text-faint);">💡 {{ q.explanation }}</div>{% endif %}
+            {% if q.topic %}<span class="badge badge-gray" style="font-size:10px; margin-top:8px; display:inline-block;">{{ q.topic }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+</div>
+{% endblock %}

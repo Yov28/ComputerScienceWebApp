@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Add Resource — {{ week.title }}{% endblock %}
+{% block content %}
+<div class="wrap" style="max-width:560px;">
+  <a href="{{ url_for('teacher.week_detail', slug=week.slug) }}" class="back-link">← {{ week.title }}</a>
+  <div class="page-header"><h1>Add Resource</h1><p>Link to slides stored in Google Drive / OneDrive, or upload a file.</p></div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div style="background:var(--blue-dim); border:1px solid rgba(96,165,250,0.2); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:20px; font-size:13px; color:var(--text-muted); line-height:1.6;">
+    💡 <strong style="color:var(--text);">Recommended: use a link.</strong> Upload your PowerPoint to Google Drive or OneDrive, set sharing to "Anyone with the link", then paste that link here. Links never expire — uploaded files may be removed when the server restarts.
+  </div>
+
+  <div class="card" style="padding:28px;">
+    <form method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label class="form-label">Resource title</label>
+        <input class="form-input" type="text" name="title" placeholder="e.g. Week 3 Slides, Revision Notes...">
+      </div>
+      <div class="form-group">
+        <label class="form-label required">Type</label>
+        <select class="form-select" name="slide_type" id="slide-type" onchange="toggleType()">
+          <option value="link">🔗 Link (Google Drive, OneDrive, YouTube) — recommended</option>
+          <option value="file">📄 Upload a file (PDF, PPTX, Image)</option>
+        </select>
+      </div>
+      <div id="link-group" class="form-group">
+        <label class="form-label required">URL</label>
+        <input class="form-input" type="url" name="url" id="url-input" placeholder="https://drive.google.com/...">
+        <p class="form-hint">Make sure the link is set to "Anyone with the link can view".</p>
+      </div>
+      <div id="file-group" class="form-group" style="display:none;">
+        <label class="form-label">File</label>
+        <input class="form-input" type="file" name="file" accept=".pdf,.pptx,.ppt,.png,.jpg,.jpeg,.gif" style="padding:8px;">
+        <p class="form-hint">PDF, PPTX, PNG, JPG — max 32MB. Note: uploaded files may not persist on free hosting.</p>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button type="submit" class="btn btn-primary">Add resource</button>
+        <a href="{{ url_for('teacher.week_detail', slug=week.slug) }}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function toggleType() {
+  const t = document.getElementById('slide-type').value;
+  document.getElementById('file-group').style.display = t === 'file' ? '' : 'none';
+  document.getElementById('link-group').style.display = t === 'link' ? '' : 'none';
+  document.getElementById('url-input').required = (t === 'link');
+}
+toggleType();
+</script>
+{% endblock %}

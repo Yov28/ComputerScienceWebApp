@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}My Progress{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-header">
+    <h1>My Progress</h1>
+    <p>Your quiz history across all unlocked weeks.</p>
+  </div>
+  {% if not progress %}
+    <div class="empty-state"><h3>No quizzes taken yet</h3><p>Go to the home page and start a quiz!</p></div>
+  {% else %}
+    {% for item in progress %}
+    {% set week = item.week %}
+    {% set best = item.best %}
+    {% set pct = (best.score/best.total*100)|round|int if best else 0 %}
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">{% if week.is_intro %}Intro{% else %}Week {{ week.week_number }}{% endif %}</div>
+          <div style="font-size:16px; font-weight:600; margin-bottom:6px;">{{ week.title }}</div>
+          {% if best %}
+            <div style="font-size:13px; color:var(--text-muted);">Best: <span style="color:{% if pct>=70 %}var(--accent){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %}; font-weight:600;">{{ best.score }}/{{ best.total }} ({{ pct }}%)</span> · {{ item.attempts|length }} attempt{{ 's' if item.attempts|length != 1 }}</div>
+            <div class="progress-track" style="margin-top:10px; max-width:300px;">
+              <div class="progress-fill {% if pct<50 %}red{% elif pct<70 %}amber{% endif %}" style="width:{{ pct }}%;"></div>
+            </div>
+          {% else %}
+            <div style="font-size:13px; color:var(--text-faint);">Not attempted yet</div>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('student.week_detail', slug=week.slug) }}" class="btn btn-secondary btn-sm">View →</a>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

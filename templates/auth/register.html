@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Create Account{% endblock %}
+{% block content %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; position:relative; z-index:1;">
+  <div style="width:100%; max-width:440px;">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-family:'DM Serif Display',serif; font-size:28px; letter-spacing:-0.02em; margin-bottom:8px;">GCSE<span style="color:var(--accent)">.</span>CS</div>
+      <p style="color:var(--text-muted); font-size:15px;">Create your student account</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    <div class="card" style="padding:32px;">
+      <h2 style="font-size:20px; font-weight:600; margin-bottom:24px;">Create account</h2>
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label required">Full name</label>
+          <input class="form-input" type="text" name="full_name" placeholder="e.g. Alex Johnson" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Username</label>
+            <input class="form-input" type="text" name="username" placeholder="e.g. alexj" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Email</label>
+            <input class="form-input" type="email" name="email" placeholder="your@email.com" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Password</label>
+            <input class="form-input" type="password" name="password" placeholder="min 6 chars" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Confirm password</label>
+            <input class="form-input" type="password" name="confirm_password" placeholder="repeat password" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%; justify-content:center; margin-top:8px;">Create account →</button>
+      </form>
+      <hr class="divider">
+      <p style="font-size:13px; color:var(--text-faint); text-align:center;">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}

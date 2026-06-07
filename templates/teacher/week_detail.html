@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ week.title }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <a href="{{ url_for('teacher.weeks') }}" class="back-link">← All weeks</a>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="page-header-row page-header">
+    <div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <span class="badge {% if week.is_enabled %}badge-green{% else %}badge-gray{% endif %}">{% if week.is_enabled %}✓ Enabled{% else %}🔒 Locked{% endif %}</span>
+        {% if week.is_intro %}<span class="badge badge-amber">Intro</span>{% endif %}
+      </div>
+      <h1>{{ week.title }}</h1>
+      <p>{{ week.description }}</p>
+      <p style="font-size:13px; color:var(--text-faint); margin-top:6px;">{{ attempts_count }} completed attempt{{ 's' if attempts_count != 1 }}</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+      <form method="POST" action="{{ url_for('teacher.toggle_week', slug=week.slug) }}">
+        <button type="submit" class="btn {% if week.is_enabled %}btn-danger{% else %}btn-amber{% endif %}">
+          {% if week.is_enabled %}🔒 Disable for students{% else %}🔓 Enable for students{% endif %}
+        </button>
+      </form>
+      <a href="{{ url_for('teacher.edit_week', slug=week.slug) }}" class="btn btn-secondary btn-sm">✏️ Edit details</a>
+    </div>
+  </div>
+
+  <!-- Questions section -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Questions ({{ questions|length }})</div>
+    <a href="{{ url_for('teacher.add_question', slug=week.slug) }}" class="btn btn-primary btn-sm">+ Add question</a>
+  </div>
+
+  {% if questions %}
+    {% for q in questions %}
+    <div class="card-sm" style="margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; gap:12px;">
+        <span style="font-size:12px; color:var(--text-faint); min-width:28px; margin-top:3px; font-weight:600;">Q{{ loop.index }}</span>
+        <div style="flex:1;">
+          <div style="font-size:14px; font-weight:500; margin-bottom:8px; color:var(--text);">{{ q.text }}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+            {% for opt in q.options %}
+            <span style="font-size:12px; padding:2px 8px; border-radius:99px;
+              background:{% if opt.is_correct %}var(--accent-dim){% else %}var(--surface2){% endif %};
+              color:{% if opt.is_correct %}var(--accent){% else %}var(--text-faint){% endif %};
+              border:1px solid {% if opt.is_correct %}rgba(74,222,128,0.3){% else %}var(--border){% endif %};">
+              {{ opt.text }}{% if opt.is_correct %} ✓{% endif %}
+            </span>
+            {% endfor %}
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            {% if q.topic %}<span class="badge badge-blue" style="font-size:10px;">{{ q.topic }}</span>{% endif %}
+            {% if q.section %}<span class="badge badge-gray" style="font-size:10px;">{{ q.section }}</span>{% endif %}
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <a href="{{ url_for('teacher.edit_question', q_id=q.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+          <form method="POST" action="{{ url_for('teacher.delete_question', q_id=q.id) }}" onsubmit="return confirm('Delete this question?')">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="padding:32px; border:1px dashed var(--border); border-radius:var(--radius);">
+      <h3>No questions yet</h3>
+      <p>Add your first question to this week.</p>
+      <a href="{{ url_for('teacher.add_question', slug=week.slug) }}" class="btn btn-primary btn-sm">+ Add question</a>
+    </div>
+  {% endif %}
+
+  <hr class="divider">
+
+  <!-- Resources section -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">Resources / Slides ({{ slides|length }})</div>
+    <a href="{{ url_for('teacher.add_slide', slug=week.slug) }}" class="btn btn-secondary btn-sm">+ Add resource</a>
+  </div>
+
+  {% if slides %}
+    {% for slide in slides %}
+    <div class="card-sm" style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+      <span style="font-size:22px;">{% if slide.file_type == 'pdf' %}📄{% elif slide.file_type in ['pptx','ppt'] %}📊{% elif slide.file_type == 'image' %}🖼️{% else %}🔗{% endif %}</span>
+      <div style="flex:1;">
+        <div style="font-size:14px; font-weight:500;">{{ slide.title or 'Untitled' }}</div>
+        <div style="font-size:11px; color:var(--text-faint);">{{ slide.file_type | upper }} · {{ slide.uploaded_at.strftime('%d %b %Y') }}</div>
+      </div>
+      {% if slide.url %}
+        <a href="{{ slide.url }}" target="_blank" class="btn btn-secondary btn-sm">Preview ↗</a>
+      {% elif slide.filename %}
+        <a href="{{ url_for('static', filename='uploads/' + slide.filename) }}" target="_blank" class="btn btn-secondary btn-sm">Preview</a>
+      {% endif %}
+      <form method="POST" action="{{ url_for('teacher.delete_slide', slide_id=slide.id) }}" onsubmit="return confirm('Delete this resource?')">
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="padding:24px; border:1px dashed var(--border); border-radius:var(--radius);">
+      <h3>No resources yet</h3>
+      <p>Upload slides, PDFs, or add links for students to view.</p>
+      <a href="{{ url_for('teacher.add_slide', slug=week.slug) }}" class="btn btn-secondary btn-sm">+ Add resource</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

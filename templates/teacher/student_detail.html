@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ student.full_name }} — Results{% endblock %}
+{% block content %}
+<div class="wrap">
+  <a href="{{ url_for('teacher.students') }}" class="back-link">← Students</a>
+  <div class="page-header-row page-header">
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div style="width:56px; height:56px; border-radius:50%; background:var(--blue-dim); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:var(--blue);">{{ student.full_name[0].upper() }}</div>
+      <div>
+        <h1>{{ student.full_name }}</h1>
+        <p>@{{ student.username }} · {{ student.email }} · joined {{ student.created_at.strftime('%d %b %Y') }}</p>
+      </div>
+    </div>
+  </div>
+
+  {% for item in week_data %}
+  {% set week = item.week %}
+  {% set attempts = item.attempts %}
+  {% set best = item.best %}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <div style="flex:1;">
+        <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">{% if week.is_intro %}Intro{% else %}Week {{ week.week_number }}{% endif %}</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px;">{{ week.title }}</div>
+        {% if best %}
+          {% set pct = (best.score/best.total*100)|round|int %}
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <span style="font-size:14px; color:{% if pct>=70 %}var(--accent){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %}; font-weight:600;">Best: {{ best.score }}/{{ best.total }} ({{ pct }}%)</span>
+            <span style="font-size:13px; color:var(--text-faint);">{{ attempts|length }} attempt{{ 's' if attempts|length != 1 }}</span>
+          </div>
+          <div class="progress-track" style="margin-top:10px; max-width:280px;">
+            <div class="progress-fill {% if pct<50 %}red{% elif pct<70 %}amber{% endif %}" style="width:{{ pct }}%;"></div>
+          </div>
+        {% else %}
+          <span style="font-size:13px; color:var(--text-faint);">Not attempted</span>
+        {% endif %}
+      </div>
+      {% if attempts %}
+      <div>
+        <div class="section-title" style="margin-bottom:8px; text-align:right;">Attempts</div>
+        {% for attempt in attempts %}
+        {% set pct = (attempt.score/attempt.total*100)|round|int %}
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; justify-content:flex-end;">
+          <span style="font-size:12px; color:var(--text-faint);">{{ attempt.completed_at.strftime('%d %b, %H:%M') }}</span>
+          <span style="font-size:13px; font-weight:600; color:{% if pct>=70 %}var(--accent){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %};">{{ attempt.score }}/{{ attempt.total }}</span>
+          <a href="{{ url_for('teacher.view_attempt', attempt_id=attempt.id) }}" class="btn btn-secondary btn-sm">View →</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-header-row page-header">
+    <div><h1>Students</h1><p>Manage student accounts and view their results.</p></div>
+    <a href="{{ url_for('teacher.add_student') }}" class="btn btn-primary">+ Add student</a>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% if student_data %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Student</th><th>Username</th><th>Joined</th><th>Attempts</th><th>Last activity</th><th></th></tr></thead>
+      <tbody>
+        {% for item in student_data %}
+        {% set s = item.user %}
+        <tr style="cursor:pointer;" onclick="location.href='{{ url_for('teacher.student_detail', student_id=s.id) }}'">
+          <td>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:32px; height:32px; border-radius:50%; background:var(--blue-dim); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--blue);">{{ s.full_name[0].upper() }}</div>
+              <span style="font-weight:500; color:var(--text);">{{ s.full_name }}</span>
+            </div>
+          </td>
+          <td>@{{ s.username }}</td>
+          <td>{{ s.created_at.strftime('%d %b %Y') }}</td>
+          <td><span style="color:var(--text);">{{ item.completed_attempts }}</span></td>
+          <td>{% if item.last_attempt %}{{ item.last_attempt.completed_at.strftime('%d %b %Y') }}{% else %}<span style="color:var(--text-faint);">Never</span>{% endif %}</td>
+          <td onclick="event.stopPropagation();">
+            <div style="display:flex; gap:6px;">
+              <a href="{{ url_for('teacher.student_detail', student_id=s.id) }}" class="btn btn-secondary btn-sm">View</a>
+              <form method="POST" action="{{ url_for('teacher.delete_student', student_id=s.id) }}" onsubmit="return confirm('Delete {{ s.full_name }}? This cannot be undone.')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No students yet</h3>
+    <p>Add a student or share the registration link.</p>
+    <a href="{{ url_for('teacher.add_student') }}" class="btn btn-primary">+ Add student</a>
+  </div>
+  {% endif %}
+  <div style="margin-top:20px; padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--text-muted);">
+    💡 Students can also self-register at <strong>/register</strong> — they'll automatically get a student account.
+  </div>
+</div>
+{% endblock %}

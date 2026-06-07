@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ week.title }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <a href="{{ url_for('student.home') }}" class="back-link">← Back to home</a>
+
+  <div class="page-header">
+    <p style="color:var(--accent); font-size:13px; font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">
+      {% if week.is_intro %}Introductory{% else %}Week {{ week.week_number }}{% endif %}
+    </p>
+    <h1>📁 {{ week.title }}</h1>
+    <p>{{ week.description }}</p>
+  </div>
+
+  <!-- FILES / MATERIALS — main content -->
+  <div style="margin-bottom:36px;">
+    <div class="section-title">Materials ({{ slides|length }})</div>
+    {% if slides %}
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px;">
+        {% for slide in slides %}
+        <div class="card" style="padding:18px; cursor:pointer; transition:border-color 0.2s, transform 0.15s;"
+             onclick="openFile('{{ slide.file_type }}', '{% if slide.url %}{{ slide.url }}{% else %}{{ url_for('static', filename='uploads/' + slide.filename) }}{% endif %}', '{{ (slide.title or slide.filename or 'Resource') | replace("'", " ") }}')">
+          <div style="font-size:34px; margin-bottom:10px;">
+            {% if slide.file_type == 'pdf' %}📄
+            {% elif slide.file_type in ['pptx','ppt'] %}📊
+            {% elif slide.file_type == 'image' %}🖼️
+            {% else %}🔗{% endif %}
+          </div>
+          <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; word-break:break-word;">{{ slide.title or slide.filename or 'Resource' }}</div>
+          <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em;">{{ slide.file_type }} · open →</div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state" style="padding:32px; border:1px dashed var(--border); border-radius:var(--radius);">
+        <h3>No materials yet</h3>
+        <p>Your teacher hasn't added any slides or files to this folder yet.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- QUIZ — optional section -->
+  {% if questions %}
+  <hr class="divider">
+  <div class="card" style="border-left:3px solid var(--accent);">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <span style="font-size:20px;">📝</span>
+          <span style="font-size:16px; font-weight:600;">Quiz available</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">{{ questions|length }} question{{ 's' if questions|length != 1 }} to test your knowledge of this topic.</p>
+        {% if past_attempts %}
+          {% set best = past_attempts|sort(attribute='score')|last %}
+          <p style="font-size:13px; color:var(--accent); margin-top:6px;">Best so far: {{ best.score }}/{{ best.total }} ({{ (best.score/best.total*100)|round|int }}%)</p>
+        {% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('student.start_quiz', slug=week.slug) }}">
+        <button type="submit" class="btn btn-primary btn-lg">{% if past_attempts %}Retake quiz{% else %}Start quiz{% endif %} →</button>
+      </form>
+    </div>
+
+    {% if past_attempts %}
+    <hr class="divider" style="margin:20px 0;">
+    <div class="section-title">Your attempts</div>
+    {% for attempt in past_attempts %}
+    {% set pct = (attempt.score/attempt.total*100)|round|int %}
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border);">
+      <div style="font-size:13px; color:var(--text-faint);">{{ attempt.completed_at.strftime('%d %b %Y, %H:%M') }}</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:13px; font-weight:600; color:{% if pct>=70 %}var(--accent){% elif pct>=50 %}var(--amber){% else %}var(--red){% endif %};">{{ attempt.score }}/{{ attempt.total }} ({{ pct }}%)</span>
+        <a href="{{ url_for('student.results', attempt_id=attempt.id) }}" class="btn btn-secondary btn-sm">View</a>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- In-app file viewer modal -->
+<div id="file-modal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.8); padding:24px;">
+  <div style="max-width:1000px; height:100%; margin:0 auto; display:flex; flex-direction:column;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; gap:12px;">
+      <div id="file-modal-title" style="font-size:15px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <a id="file-modal-download" href="#" target="_blank" class="btn btn-secondary btn-sm" style="color:#fff; border-color:rgba(255,255,255,0.3);">Open in new tab ↗</a>
+        <button onclick="closeFile()" class="btn btn-secondary btn-sm" style="color:#fff; border-color:rgba(255,255,255,0.3);">✕ Close</button>
+      </div>
+    </div>
+    <div id="file-modal-body" style="flex:1; background:#fff; border-radius:var(--radius); overflow:hidden;"></div>
+  </div>
+</div>
+
+<script>
+function openFile(type, src, title) {
+  const modal = document.getElementById('file-modal');
+  const body = document.getElementById('file-modal-body');
+  document.getElementById('file-modal-title').textContent = title;
+  document.getElementById('file-modal-download').href = src;
+
+  const absolute = src.startsWith('http') ? src : (window.location.origin + src);
+
+  if (type === 'pdf') {
+    body.innerHTML = `<iframe src="${src}" style="width:100%; height:100%; border:none;"></iframe>`;
+  } else if (type === 'image') {
+    body.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1a1a1a;"><img src="${src}" style="max-width:100%; max-height:100%; object-fit:contain;"></div>`;
+  } else if (type === 'pptx' || type === 'ppt') {
+    const viewer = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(absolute);
+    body.innerHTML = `<iframe src="${viewer}" style="width:100%; height:100%; border:none;"></iframe>`;
+  } else {
+    body.innerHTML = `<iframe src="${src}" style="width:100%; height:100%; border:none;"></iframe>`;
+  }
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeFile() {
+  document.getElementById('file-modal').style.display = 'none';
+  document.getElementById('file-modal-body').innerHTML = '';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFile(); });
+</script>
+{% endblock %}

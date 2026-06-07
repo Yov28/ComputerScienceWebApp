@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-header" style="padding-top:36px;">
+    <p style="color:var(--accent); font-size:13px; font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">Welcome back</p>
+    <h1>{{ current_user.full_name }}</h1>
+    <p>Open a folder to view its slides and materials. Some folders also include a quiz.</p>
+  </div>
+
+  {% set intro = weeks | selectattr('is_intro') | list | first %}
+  {% if intro %}
+  <div style="margin-bottom:40px;">
+    <div class="section-title">Start here</div>
+    {% set attempt = attempt_map.get(intro.id) %}
+    <div class="card" style="border-color:rgba(74,222,128,0.25); position:relative; overflow:hidden; cursor:pointer;"
+         onclick="location.href='{{ url_for('student.week_detail', slug=intro.slug) }}'">
+      <div style="position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent);"></div>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <span style="font-size:22px;">📁</span>
+            <span class="badge badge-green">Intro</span>
+            {% if intro.questions|length %}<span class="badge badge-blue">Quiz</span>{% endif %}
+            {% if attempt %}<span class="badge badge-green">✓ Completed</span>{% endif %}
+          </div>
+          <h2 style="font-family:'DM Serif Display',serif; font-size:22px; margin-bottom:6px;">{{ intro.title }}</h2>
+          <p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">{{ intro.description }}</p>
+          <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <span style="font-size:13px; color:var(--text-faint);">{{ intro.slides|length }} material{{ 's' if intro.slides|length != 1 }}</span>
+            {% if intro.questions|length %}<span style="font-size:13px; color:var(--text-faint);">{{ intro.questions|length }} quiz questions</span>{% endif %}
+            {% if attempt %}<span style="font-size:13px; color:var(--accent);">Best: {{ attempt.score }}/{{ attempt.total }} ({{ (attempt.score/attempt.total*100)|round|int }}%)</span>{% endif %}
+          </div>
+        </div>
+        <span class="btn btn-primary btn-lg">Open folder →</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div>
+    <div class="section-title">Weekly folders</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:14px;">
+      {% for week in weeks if not week.is_intro %}
+        {% set attempt = attempt_map.get(week.id) %}
+        <div class="card" style="{% if not week.is_enabled %}opacity:0.5;{% endif %} transition:border-color 0.2s, transform 0.15s; {% if week.is_enabled %}cursor:pointer;{% endif %}"
+             {% if week.is_enabled %}onclick="location.href='{{ url_for('student.week_detail', slug=week.slug) }}'"{% endif %}>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <span style="font-size:24px;">{% if week.is_enabled %}📁{% else %}🔒{% endif %}</span>
+            {% if not week.is_enabled %}
+              <span class="badge badge-gray">Locked</span>
+            {% else %}
+              <div style="display:flex; gap:6px;">
+                {% if week.slides|length %}<span class="badge badge-amber">{{ week.slides|length }} file{{ 's' if week.slides|length != 1 }}</span>{% endif %}
+                {% if week.questions|length %}<span class="badge badge-blue">Quiz</span>{% endif %}
+                {% if attempt %}<span class="badge badge-green">✓</span>{% endif %}
+              </div>
+            {% endif %}
+          </div>
+          <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:4px;">Week {{ week.week_number }}</div>
+          <h3 style="font-size:16px; font-weight:600; margin-bottom:6px; color:var(--text);">{{ week.title }}</h3>
+          <p style="font-size:13px; color:var(--text-faint); line-height:1.5;">{{ week.description }}</p>
+          {% if week.is_enabled and attempt %}
+            {% set pct = (attempt.score/attempt.total*100)|round|int %}
+            <div class="progress-track" style="margin-top:10px;">
+              <div class="progress-fill {% if pct<50 %}red{% elif pct<70 %}amber{% endif %}" style="width:{{ pct }}%;"></div>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

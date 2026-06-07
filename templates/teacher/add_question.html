@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Add Question — {{ week.title }}{% endblock %}
+{% block content %}
+<div class="wrap" style="max-width:680px;">
+  <a href="{{ url_for('teacher.week_detail', slug=week.slug) }}" class="back-link">← {{ week.title }}</a>
+  <div class="page-header"><h1>Add Question</h1><p>{{ week.title }}</p></div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  <div class="card" style="padding:28px;">
+    <form method="POST">
+      <div class="form-group">
+        <label class="form-label required">Question text</label>
+        <textarea class="form-textarea" name="text" rows="3" placeholder="Type the question here..." required></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Topic</label>
+          <input class="form-input" type="text" name="topic" placeholder="e.g. Binary arithmetic">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section / Paper</label>
+          <input class="form-input" type="text" name="section" placeholder="e.g. Paper 1 — Principles">
+        </div>
+      </div>
+      <div class="form-group"><div class="section-title" style="margin-bottom:12px;">Answer options — tick the correct one</div>
+        {% for i in range(4) %}
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <input type="radio" name="correct_option" value="{{ i }}" id="opt{{ i }}" {% if i==0 %}checked{% endif %} style="accent-color:var(--accent); width:16px; height:16px; flex-shrink:0;">
+          <label for="opt{{ i }}" style="font-size:13px; color:var(--text-muted); min-width:20px;">{{ ['A','B','C','D'][i] }}</label>
+          <input class="form-input" type="text" name="option_{{ i }}" placeholder="Option {{ ['A','B','C','D'][i] }}" required style="flex:1;">
+        </div>
+        {% endfor %}
+        <p class="form-hint">Select the radio button next to the correct answer.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Explanation (shown after answering)</label>
+        <textarea class="form-textarea" name="explanation" rows="2" placeholder="Explain why the correct answer is correct..."></textarea>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button type="submit" class="btn btn-primary">Save question</button>
+        <a href="{{ url_for('teacher.week_detail', slug=week.slug) }}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
