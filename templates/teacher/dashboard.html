@@ -18,7 +18,8 @@
     <div class="stat-card"><div class="stat-label">Students</div><div class="stat-val blue">{{ students|length }}</div></div>
     <div class="stat-card"><div class="stat-label">Weeks enabled</div><div class="stat-val green">{{ weeks | selectattr('is_enabled') | list | length }}</div></div>
     <div class="stat-card"><div class="stat-label">Total attempts</div><div class="stat-val">{{ total_attempts }}</div></div>
-    <div class="stat-card"><div class="stat-label">Total questions</div><div class="stat-val amber">{{ weeks | map(attribute='questions') | map('length') | sum }}</div></div>
+    <div class="stat-card" {% if pending_marks %}style="border-color:rgba(251,191,36,0.4); cursor:pointer;" onclick="location.href='{{ url_for('teacher.marking_queue') }}'"{% endif %}><div class="stat-label">To mark</div><div class="stat-val amber">{{ pending_marks }}</div></div>
+    <div class="stat-card" {% if new_submissions %}style="border-color:rgba(96,165,250,0.4); cursor:pointer;" onclick="location.href='{{ url_for('teacher.submissions') }}'"{% endif %}><div class="stat-label">New submissions</div><div class="stat-val blue">{{ new_submissions }}</div></div>
   </div>
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">

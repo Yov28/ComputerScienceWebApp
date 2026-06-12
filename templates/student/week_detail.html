@@ -3,6 +3,11 @@
 {% block content %}
 <div class="wrap">
   <a href="{{ url_for('student.home') }}" class="back-link">← Back to home</a>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
 
   <div class="page-header">
     <p style="color:var(--accent); font-size:13px; font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">
@@ -12,19 +17,16 @@
     <p>{{ week.description }}</p>
   </div>
 
-  <!-- FILES / MATERIALS — main content -->
+  <!-- MATERIALS -->
   <div style="margin-bottom:36px;">
     <div class="section-title">Materials ({{ slides|length }})</div>
     {% if slides %}
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px;">
         {% for slide in slides %}
-        <div class="card" style="padding:18px; cursor:pointer; transition:border-color 0.2s, transform 0.15s;"
+        <div class="card" style="padding:18px; cursor:pointer;"
              onclick="openFile('{{ slide.file_type }}', '{% if slide.url %}{{ slide.url }}{% else %}{{ url_for('static', filename='uploads/' + slide.filename) }}{% endif %}', '{{ (slide.title or slide.filename or 'Resource') | replace("'", " ") }}')">
           <div style="font-size:34px; margin-bottom:10px;">
-            {% if slide.file_type == 'pdf' %}📄
-            {% elif slide.file_type in ['pptx','ppt'] %}📊
-            {% elif slide.file_type == 'image' %}🖼️
-            {% else %}🔗{% endif %}
+            {% if slide.file_type == 'pdf' %}📄{% elif slide.file_type in ['pptx','ppt'] %}📊{% elif slide.file_type == 'image' %}🖼️{% else %}🔗{% endif %}
           </div>
           <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; word-break:break-word;">{{ slide.title or slide.filename or 'Resource' }}</div>
           <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em;">{{ slide.file_type }} · open →</div>
@@ -39,10 +41,10 @@
     {% endif %}
   </div>
 
-  <!-- QUIZ — optional section -->
+  <!-- QUIZ (only if questions exist) -->
   {% if questions %}
   <hr class="divider">
-  <div class="card" style="border-left:3px solid var(--accent);">
+  <div class="card" style="border-left:3px solid var(--accent); margin-bottom:36px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
       <div>
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
@@ -76,6 +78,60 @@
     {% endif %}
   </div>
   {% endif %}
+
+  <!-- SUBMIT WORK -->
+  <hr class="divider">
+  <div class="card" style="border-left:3px solid var(--blue);">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+      <span style="font-size:20px;">📤</span>
+      <span style="font-size:16px; font-weight:600;">Submit your work</span>
+    </div>
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:18px;">Upload homework or exercises for this week (PDF, Word, images, code files — max 10MB). Your teacher will review it and leave feedback.</p>
+
+    <form method="POST" action="{{ url_for('student.submit_work', slug=week.slug) }}" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Title (optional)</label>
+          <input class="form-input" type="text" name="title" placeholder="e.g. Binary worksheet answers">
+        </div>
+        <div class="form-group">
+          <label class="form-label required">File</label>
+          <input class="form-input" type="file" name="file" required style="padding:8px;"
+                 accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.py,.zip,.pptx,.ppt,.xlsx,.csv,.md">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note to your teacher (optional)</label>
+        <textarea class="form-textarea" name="comment" rows="2" placeholder="Anything you'd like your teacher to know..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit work →</button>
+    </form>
+
+    {% if my_submissions %}
+    <hr class="divider" style="margin:20px 0;">
+    <div class="section-title">Your submissions</div>
+    {% for sub in my_submissions %}
+    <div class="card-sm" style="margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:22px;">📎</span>
+        <div style="flex:1; min-width:200px;">
+          <div style="font-size:14px; font-weight:600;">{{ sub.title or sub.file_name }}</div>
+          <div style="font-size:11px; color:var(--text-faint);">{{ sub.file_format | upper }} · {{ sub.submitted_at.strftime('%d %b %Y, %H:%M') }}</div>
+          {% if sub.reviewed_at %}
+            <div style="margin-top:8px; padding:10px 12px; background:var(--accent-dim); border:1px solid rgba(74,222,128,0.2); border-radius:var(--radius-sm);">
+              {% if sub.grade %}<div style="font-size:13px; font-weight:600; color:var(--accent); margin-bottom:4px;">Grade: {{ sub.grade }}</div>{% endif %}
+              {% if sub.teacher_feedback %}<div style="font-size:13px; color:var(--text-muted);">{{ sub.teacher_feedback }}</div>{% endif %}
+            </div>
+          {% else %}
+            <span class="badge badge-amber" style="margin-top:6px; display:inline-block;">Awaiting review</span>
+          {% endif %}
+        </div>
+        <a href="{{ sub.file_url }}" target="_blank" class="btn btn-secondary btn-sm">View file ↗</a>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
 </div>
 
 <!-- In-app file viewer modal -->
@@ -98,7 +154,6 @@ function openFile(type, src, title) {
   const body = document.getElementById('file-modal-body');
   document.getElementById('file-modal-title').textContent = title;
   document.getElementById('file-modal-download').href = src;
-
   const absolute = src.startsWith('http') ? src : (window.location.origin + src);
 
   if (type === 'pdf') {

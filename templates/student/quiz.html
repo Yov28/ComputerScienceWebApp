@@ -12,22 +12,24 @@
 }
 .opt-btn:hover:not(:disabled) { border-color:var(--border-hover); background:rgba(255,255,255,0.05); }
 .opt-letter { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; color:var(--text-muted); transition:all 0.15s; }
-.opt-btn.correct { background:var(--accent-dim); border-color:rgba(74,222,128,0.4); }
-.opt-btn.correct .opt-letter { background:var(--accent); border-color:var(--accent); color:#0d0f14; }
+.opt-btn.correct, .opt-btn.reveal { background:var(--accent-dim); border-color:rgba(74,222,128,0.4); }
+.opt-btn.correct .opt-letter, .opt-btn.reveal .opt-letter { background:var(--accent); border-color:var(--accent); color:#0d0f14; }
 .opt-btn.wrong { background:var(--red-dim); border-color:rgba(248,113,113,0.4); }
 .opt-btn.wrong .opt-letter { background:var(--red); border-color:var(--red); color:#fff; }
-.opt-btn.reveal { background:var(--accent-dim); border-color:rgba(74,222,128,0.4); }
-.opt-btn.reveal .opt-letter { background:var(--accent); border-color:var(--accent); color:#0d0f14; }
+.opt-btn.selected { border-color:var(--blue); background:var(--blue-dim); }
+.opt-btn.selected .opt-letter { background:var(--blue); border-color:var(--blue); color:#fff; }
 .q-card { animation: fadeUp 0.25s ease; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 .explanation { margin-top:16px; padding:14px 16px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.03); font-size:13px; color:var(--text-muted); line-height:1.6; }
 .explanation.c { border-left:3px solid var(--accent); }
 .explanation.w { border-left:3px solid var(--red); }
+.explanation.p { border-left:3px solid var(--amber); }
+.text-answer-box { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; padding:12px 14px; outline:none; resize:vertical; min-height:110px; }
+.text-answer-box:focus { border-color:var(--accent); }
 </style>
 {% endblock %}
 {% block content %}
 <div class="wrap">
-  <!-- Header -->
   <div style="display:flex; align-items:center; gap:16px; padding:24px 0 20px; border-bottom:1px solid var(--border); margin-bottom:24px;">
     <a href="{{ url_for('student.week_detail', slug=week.slug) }}" class="btn btn-secondary btn-sm">← Exit</a>
     <div style="flex:1;">
@@ -37,12 +39,10 @@
     <div style="font-size:13px; color:var(--text-muted);" id="q-counter">Q1 of {{ questions|length }}</div>
   </div>
 
-  <!-- Progress -->
   <div class="progress-track" style="margin-bottom:24px;">
     <div class="progress-fill" id="q-progress" style="width:{{ (1/questions|length*100)|round|int }}%;"></div>
   </div>
 
-  <!-- Stats -->
   <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px;">
     <div class="stat-card" style="padding:14px; text-align:center;">
       <div class="stat-label">Correct</div>
@@ -53,15 +53,13 @@
       <div class="stat-val red" style="font-size:22px;" id="sc-wrong">0</div>
     </div>
     <div class="stat-card" style="padding:14px; text-align:center;">
-      <div class="stat-label">Score</div>
-      <div class="stat-val" style="font-size:22px;" id="sc-pct">—</div>
+      <div class="stat-label">For marking</div>
+      <div class="stat-val amber" style="font-size:22px;" id="sc-pending">0</div>
     </div>
   </div>
 
-  <!-- Question area -->
   <div id="q-area"></div>
 
-  <!-- Nav -->
   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
     <button class="btn btn-secondary" id="btn-prev" onclick="navigate(-1)" disabled>← Prev</button>
     <button class="btn btn-primary" id="btn-next" onclick="navigate(1)" disabled>Next →</button>
@@ -71,60 +69,94 @@
 <script>
 const questions = {{ questions_json | tojson }};
 const options_map = {{ options_json | tojson }};
+const answered = {{ answered_json | tojson }};
 const attemptId = {{ attempt.id }};
 const total = questions.length;
 let currentIdx = 0;
-let answered = {};  // question_id -> {chosen_id, is_correct, correct_id, explanation}
-let correct = 0, wrong = 0;
+let correct = 0, wrong = 0, pendingCount = 0;
+let multiSelection = [];   // working selection for the current multi question
 
-// Pre-populate already-answered questions
-{% for qid, ans in answered.items() %}
-answered[{{ qid }}] = {
-  chosen_id: {{ ans.option_id }},
-  is_correct: {{ 'true' if ans.is_correct else 'false' }},
-  correct_id: {% set co = ans.question.options | selectattr('is_correct') | first %}{{ co.id if co else 'null' }},
-  explanation: {{ ans.question.explanation | tojson }}
-};
-{% if ans.is_correct %}correct++;{% else %}wrong++;{% endif %}
-{% endfor %}
+for (const k in answered) {
+  const a = answered[k];
+  if (a.pending) pendingCount++;
+  else if (a.is_correct) correct++;
+  else wrong++;
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function render() {
   const q = questions[currentIdx];
-  const opts = options_map[q.id];
-  const ans = answered[q.id];
+  const opts = options_map[String(q.id)] || [];
+  const ans = answered[String(q.id)];
   const letters = ['A','B','C','D'];
 
   document.getElementById('q-counter').textContent = `Q${currentIdx+1} of ${total}`;
   document.getElementById('q-progress').style.width = `${Math.round((currentIdx+1)/total*100)}%`;
-  const done = correct + wrong;
   document.getElementById('sc-correct').textContent = correct;
   document.getElementById('sc-wrong').textContent = wrong;
-  document.getElementById('sc-pct').textContent = done ? Math.round(correct/done*100)+'%' : '—';
+  document.getElementById('sc-pending').textContent = pendingCount;
 
-  const optsHtml = opts.map((o, i) => {
-    let cls = 'opt-btn';
-    if (ans) {
-      if (o.id === ans.correct_id) cls += ' reveal';
-      if (o.id === ans.chosen_id && !ans.is_correct) cls += ' wrong';
-      if (o.id === ans.chosen_id && ans.is_correct) cls = 'opt-btn correct';
-    }
-    return `<button class="${cls}" onclick="pickAnswer(${o.id})" ${ans?'disabled':''}><span class="opt-letter">${letters[i]}</span>${o.text}</button>`;
-  }).join('');
+  const topicHtml = q.topic ? `<span class="badge badge-blue" style="margin-bottom:14px; display:inline-block;">${esc(q.topic)}</span>` : '';
+  const sectionHtml = q.section ? `<div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">${esc(q.section)}</div>` : '';
 
+  let bodyHtml = '';
   let expHtml = '';
-  if (ans) {
-    const v = ans.is_correct ? '<span style="color:var(--accent);font-weight:600;">✓ Correct</span>' : '<span style="color:var(--red);font-weight:600;">✗ Incorrect</span>';
-    expHtml = `<div class="explanation ${ans.is_correct?'c':'w'}">${v} — ${ans.explanation||''}</div>`;
-  }
 
-  const topicHtml = q.topic ? `<span class="badge badge-blue" style="margin-bottom:14px; display:inline-block;">${q.topic}</span>` : '';
-  const sectionHtml = q.section ? `<div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">${q.section}</div>` : '';
+  if (q.qtype === 'mcq') {
+    bodyHtml = opts.map((o, i) => {
+      let cls = 'opt-btn';
+      if (ans) {
+        if (o.id === ans.correct_id) cls += ' reveal';
+        if (o.id === ans.chosen_id && !ans.is_correct) cls += ' wrong';
+        if (o.id === ans.chosen_id && ans.is_correct) cls = 'opt-btn correct';
+      }
+      return `<button class="${cls}" onclick="pickMcq(${o.id})" ${ans?'disabled':''}><span class="opt-letter">${letters[i]}</span>${esc(o.text)}</button>`;
+    }).join('');
+    if (ans) {
+      const v = ans.is_correct ? '<span style="color:var(--accent);font-weight:600;">✓ Correct</span>' : '<span style="color:var(--red);font-weight:600;">✗ Incorrect</span>';
+      expHtml = `<div class="explanation ${ans.is_correct?'c':'w'}">${v}${ans.explanation ? ' — ' + esc(ans.explanation) : ''}</div>`;
+    }
+
+  } else if (q.qtype === 'multi') {
+    const hint = `<p style="font-size:12px; color:var(--amber); margin-bottom:12px;">Tick ALL the answers that apply, then press Submit.</p>`;
+    bodyHtml = hint + opts.map((o, i) => {
+      let cls = 'opt-btn';
+      if (ans) {
+        const chosen = ans.chosen_ids.includes(o.id);
+        const isRight = ans.correct_ids.includes(o.id);
+        if (isRight) cls += ' reveal';
+        if (chosen && !isRight) cls += ' wrong';
+      } else if (multiSelection.includes(o.id)) {
+        cls += ' selected';
+      }
+      return `<button class="${cls}" onclick="toggleMulti(${o.id})" ${ans?'disabled':''}><span class="opt-letter">${letters[i]}</span>${esc(o.text)}</button>`;
+    }).join('');
+    if (!ans) {
+      bodyHtml += `<button class="btn btn-primary" style="margin-top:8px;" onclick="submitMulti()" ${multiSelection.length===0?'disabled':''}>Submit answer</button>`;
+    } else {
+      const v = ans.is_correct ? '<span style="color:var(--accent);font-weight:600;">✓ Correct — you picked exactly the right set</span>' : '<span style="color:var(--red);font-weight:600;">✗ Incorrect — the highlighted options were the right set</span>';
+      expHtml = `<div class="explanation ${ans.is_correct?'c':'w'}">${v}${ans.explanation ? ' — ' + esc(ans.explanation) : ''}</div>`;
+    }
+
+  } else {  // text
+    if (!ans) {
+      bodyHtml = `
+        <textarea class="text-answer-box" id="text-answer" placeholder="Type your answer here..."></textarea>
+        <button class="btn btn-primary" style="margin-top:12px;" onclick="submitText()">Submit answer</button>`;
+    } else {
+      bodyHtml = `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; font-size:14px; color:var(--text); white-space:pre-wrap;">${esc(ans.text_answer)}</div>`;
+      expHtml = `<div class="explanation p"><span style="color:var(--amber);font-weight:600;">⏳ Submitted</span> — your teacher will mark this answer.</div>`;
+    }
+  }
 
   document.getElementById('q-area').innerHTML = `
     <div class="q-card card" style="padding:24px;">
       ${sectionHtml}${topicHtml}
-      <div style="font-size:17px; line-height:1.55; margin-bottom:22px;">${q.text}</div>
-      <div>${optsHtml}</div>
+      <div style="font-size:17px; line-height:1.55; margin-bottom:22px;">${esc(q.text)}</div>
+      <div>${bodyHtml}</div>
       ${expHtml}
     </div>`;
 
@@ -142,20 +174,62 @@ function render() {
   }
 }
 
-async function pickAnswer(optionId) {
-  const q = questions[currentIdx];
-  if (answered[q.id]) return;
+async function postAnswer(payload) {
   const res = await fetch('/student/quiz/answer', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({attempt_id: attemptId, question_id: q.id, option_id: optionId})
+    body: JSON.stringify(payload)
   });
-  const data = await res.json();
+  return res.json();
+}
+
+async function pickMcq(optionId) {
+  const q = questions[currentIdx];
+  if (answered[String(q.id)]) return;
+  const data = await postAnswer({attempt_id: attemptId, question_id: q.id, option_id: optionId});
+  if (data.error) return;
   if (data.is_correct) correct++; else wrong++;
-  answered[q.id] = {chosen_id: optionId, is_correct: data.is_correct, correct_id: data.correct_option_id, explanation: data.explanation};
+  answered[String(q.id)] = {qtype:'mcq', chosen_id: optionId, chosen_ids: [], is_correct: data.is_correct,
+                            pending:false, correct_id: data.correct_id, correct_ids: [], explanation: data.explanation};
+  render();
+}
+
+function toggleMulti(optionId) {
+  const q = questions[currentIdx];
+  if (answered[String(q.id)]) return;
+  const idx = multiSelection.indexOf(optionId);
+  if (idx >= 0) multiSelection.splice(idx, 1);
+  else multiSelection.push(optionId);
+  render();
+}
+
+async function submitMulti() {
+  const q = questions[currentIdx];
+  if (answered[String(q.id)] || multiSelection.length === 0) return;
+  const data = await postAnswer({attempt_id: attemptId, question_id: q.id, option_ids: multiSelection});
+  if (data.error) return;
+  if (data.is_correct) correct++; else wrong++;
+  answered[String(q.id)] = {qtype:'multi', chosen_id: null, chosen_ids: multiSelection.slice(),
+                            is_correct: data.is_correct, pending:false, correct_id: null,
+                            correct_ids: data.correct_ids, explanation: data.explanation};
+  multiSelection = [];
+  render();
+}
+
+async function submitText() {
+  const q = questions[currentIdx];
+  if (answered[String(q.id)]) return;
+  const textVal = document.getElementById('text-answer').value.trim();
+  if (!textVal) { document.getElementById('text-answer').focus(); return; }
+  const data = await postAnswer({attempt_id: attemptId, question_id: q.id, text_answer: textVal});
+  if (data.error) return;
+  pendingCount++;
+  answered[String(q.id)] = {qtype:'text', chosen_id:null, chosen_ids:[], text_answer:textVal,
+                            is_correct:false, pending:true, correct_id:null, correct_ids:[], explanation:null};
   render();
 }
 
 function navigate(dir) {
+  multiSelection = [];
   currentIdx = Math.max(0, Math.min(total-1, currentIdx+dir));
   render();
 }

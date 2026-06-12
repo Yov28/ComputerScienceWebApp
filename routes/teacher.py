@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, abort, current_app
 from flask_login import login_required, current_user
-from models import Week, Question, Option, Attempt, Answer, User, Slide
+from models import Week, Question, Option, Attempt, Answer, User, Slide, Submission
 from extensions import db
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
@@ -31,8 +31,11 @@ def dashboard():
     weeks = Week.query.order_by(Week.week_number).all()
     students = User.query.filter_by(role='student').order_by(User.full_name).all()
     total_attempts = Attempt.query.filter_by(completed=True).count()
+    pending_marks = Answer.query.filter_by(pending=True).count()
+    new_submissions = Submission.query.filter_by(reviewed_at=None).count()
     return render_template('teacher/dashboard.html', weeks=weeks,
-                           students=students, total_attempts=total_attempts)
+                           students=students, total_attempts=total_attempts,
+                           pending_marks=pending_marks, new_submissions=new_submissions)
 
 # ── Students ───────────────────────────────────────────────────────────────────
 @teacher_bp.route('/students')
@@ -60,7 +63,10 @@ def student_detail(student_id):
             .order_by(Attempt.completed_at.desc()).all()
         best = max(attempts, key=lambda a: a.score) if attempts else None
         week_data.append({'week': week, 'attempts': attempts, 'best': best})
-    return render_template('teacher/student_detail.html', student=student, week_data=week_data)
+    submissions = Submission.query.filter_by(user_id=student_id)\
+        .order_by(Submission.submitted_at.desc()).all()
+    return render_template('teacher/student_detail.html', student=student,
+                           week_data=week_data, submissions=submissions)
 
 @teacher_bp.route('/results/<int:attempt_id>')
 @login_required
@@ -72,6 +78,67 @@ def view_attempt(attempt_id):
     pct = round(attempt.score / attempt.total * 100) if attempt.total else 0
     return render_template('teacher/view_attempt.html', attempt=attempt,
                            answers=answers, questions=questions, pct=pct)
+
+# ── Marking free-text answers ──────────────────────────────────────────────────
+@teacher_bp.route('/marking')
+@login_required
+@teacher_required
+def marking_queue():
+    pending = Answer.query.filter_by(pending=True).order_by(Answer.answered_at).all()
+    return render_template('teacher/marking.html', pending=pending)
+
+@teacher_bp.route('/answers/<int:answer_id>/mark', methods=['POST'])
+@login_required
+@teacher_required
+def mark_answer(answer_id):
+    answer = Answer.query.get_or_404(answer_id)
+    verdict = request.form.get('verdict')          # 'correct' or 'incorrect'
+    feedback = request.form.get('feedback', '').strip()
+
+    was_correct = bool(answer.is_correct)
+    answer.is_correct = (verdict == 'correct')
+    answer.pending = False
+    answer.teacher_feedback = feedback
+
+    attempt = answer.attempt
+    if answer.is_correct and not was_correct:
+        attempt.score += 1
+    elif not answer.is_correct and was_correct:
+        attempt.score = max(0, attempt.score - 1)
+
+    db.session.commit()
+    flash('Answer marked.', 'success')
+    return redirect(request.referrer or url_for('teacher.marking_queue'))
+
+# ── Submissions (student work) ─────────────────────────────────────────────────
+@teacher_bp.route('/submissions')
+@login_required
+@teacher_required
+def submissions():
+    all_subs = Submission.query.order_by(Submission.submitted_at.desc()).all()
+    return render_template('teacher/submissions.html', submissions=all_subs)
+
+@teacher_bp.route('/submissions/<int:sub_id>/review', methods=['POST'])
+@login_required
+@teacher_required
+def review_submission(sub_id):
+    sub = Submission.query.get_or_404(sub_id)
+    sub.teacher_feedback = request.form.get('feedback', '').strip()
+    sub.grade = request.form.get('grade', '').strip()
+    sub.reviewed_at = datetime.utcnow()
+    db.session.commit()
+    flash('Feedback saved.', 'success')
+    return redirect(request.referrer or url_for('teacher.submissions'))
+
+@teacher_bp.route('/submissions/<int:sub_id>/delete', methods=['POST'])
+@login_required
+@teacher_required
+def delete_submission(sub_id):
+    sub = Submission.query.get_or_404(sub_id)
+    db.session.delete(sub)
+    db.session.commit()
+    flash('Submission deleted.', 'success')
+    return redirect(request.referrer or url_for('teacher.submissions'))
 
 @teacher_bp.route('/students/add', methods=['GET', 'POST'])
 @login_required
@@ -163,8 +230,12 @@ def week_detail(slug):
     questions = week.questions
     slides = week.slides
     attempts_count = Attempt.query.filter_by(week_id=week.id, completed=True).count()
+    week_submissions = Submission.query.filter_by(week_id=week.id)\
+        .order_by(Submission.submitted_at.desc()).all()
     return render_template('teacher/week_detail.html', week=week,
-                           questions=questions, slides=slides, attempts_count=attempts_count)
+                           questions=questions, slides=slides,
+                           attempts_count=attempts_count,
+                           week_submissions=week_submissions)
 
 @teacher_bp.route('/weeks/<slug>/toggle', methods=['POST'])
 @login_required
@@ -192,29 +263,62 @@ def edit_week(slug):
     return render_template('teacher/edit_week.html', week=week)
 
 # ── Questions ──────────────────────────────────────────────────────────────────
+def _parse_question_form(form):
+    """Shared parser for add/edit question forms. Returns (dict, None) or (None, error)."""
+    qtype = form.get('qtype', 'mcq')
+    text = form.get('text', '').strip()
+    topic = form.get('topic', '').strip()
+    section = form.get('section', '').strip()
+    explanation = form.get('explanation', '').strip()
+    model_answer = form.get('model_answer', '').strip()
+
+    if not text:
+        return None, 'Question text is required.'
+
+    options, correct_flags = [], []
+    if qtype in ('mcq', 'multi'):
+        raw = [form.get(f'option_{i}', '').strip() for i in range(4)]
+        # keep original indexes so correct flags line up, but drop blank trailing options
+        kept = [(i, o) for i, o in enumerate(raw) if o]
+        if len(kept) < 2:
+            return None, 'At least 2 options are required.'
+        options = [o for _, o in kept]
+        if qtype == 'mcq':
+            correct = int(form.get('correct_option', 0))
+            correct_flags = [i == correct for i, _ in kept]
+            if not any(correct_flags):
+                return None, 'Select the correct option (it cannot be a blank one).'
+        else:
+            correct_flags = [form.get(f'correct_{i}') == 'on' for i, _ in kept]
+            if not any(correct_flags):
+                return None, 'Tick at least one correct option.'
+
+    return {
+        'qtype': qtype, 'text': text, 'topic': topic, 'section': section,
+        'explanation': explanation, 'model_answer': model_answer,
+        'options': options, 'correct_flags': correct_flags,
+    }, None
+
 @teacher_bp.route('/weeks/<slug>/questions/add', methods=['GET', 'POST'])
 @login_required
 @teacher_required
 def add_question(slug):
     week = Week.query.filter_by(slug=slug).first_or_404()
     if request.method == 'POST':
-        text = request.form.get('text', '').strip()
-        topic = request.form.get('topic', '').strip()
-        section = request.form.get('section', '').strip()
-        explanation = request.form.get('explanation', '').strip()
-        options = [request.form.get(f'option_{i}', '').strip() for i in range(4)]
-        correct = int(request.form.get('correct_option', 0))
-
-        if not text or not all(options):
-            flash('Question text and all 4 options are required.', 'error')
+        parsed, error = _parse_question_form(request.form)
+        if error:
+            flash(error, 'error')
         else:
             order = len(week.questions)
-            q = Question(week_id=week.id, text=text, topic=topic, section=section,
-                         explanation=explanation, order=order)
+            q = Question(week_id=week.id, text=parsed['text'], qtype=parsed['qtype'],
+                         topic=parsed['topic'], section=parsed['section'],
+                         explanation=parsed['explanation'],
+                         model_answer=parsed['model_answer'], order=order)
             db.session.add(q)
             db.session.flush()
-            for i, opt_text in enumerate(options):
-                opt = Option(question_id=q.id, text=opt_text, is_correct=(i == correct), order=i)
+            for i, opt_text in enumerate(parsed['options']):
+                opt = Option(question_id=q.id, text=opt_text,
+                             is_correct=parsed['correct_flags'][i], order=i)
                 db.session.add(opt)
             db.session.commit()
             flash('Question added.', 'success')
@@ -228,18 +332,25 @@ def edit_question(q_id):
     q = Question.query.get_or_404(q_id)
     week = q.week
     if request.method == 'POST':
-        q.text = request.form.get('text', '').strip()
-        q.topic = request.form.get('topic', '').strip()
-        q.section = request.form.get('section', '').strip()
-        q.explanation = request.form.get('explanation', '').strip()
-        options = [request.form.get(f'option_{i}', '').strip() for i in range(4)]
-        correct = int(request.form.get('correct_option', 0))
-        for i, opt in enumerate(q.options):
-            opt.text = options[i]
-            opt.is_correct = (i == correct)
-        db.session.commit()
-        flash('Question updated.', 'success')
-        return redirect(url_for('teacher.week_detail', slug=week.slug))
+        parsed, error = _parse_question_form(request.form)
+        if error:
+            flash(error, 'error')
+        else:
+            q.text = parsed['text']
+            q.qtype = parsed['qtype']
+            q.topic = parsed['topic']
+            q.section = parsed['section']
+            q.explanation = parsed['explanation']
+            q.model_answer = parsed['model_answer']
+            for opt in list(q.options):
+                db.session.delete(opt)
+            db.session.flush()
+            for i, opt_text in enumerate(parsed['options']):
+                db.session.add(Option(question_id=q.id, text=opt_text,
+                                      is_correct=parsed['correct_flags'][i], order=i))
+            db.session.commit()
+            flash('Question updated.', 'success')
+            return redirect(url_for('teacher.week_detail', slug=week.slug))
     return render_template('teacher/edit_question.html', week=week, question=q)
 
 @teacher_bp.route('/questions/<int:q_id>/delete', methods=['POST'])
@@ -261,7 +372,7 @@ def add_slide(slug):
     week = Week.query.filter_by(slug=slug).first_or_404()
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
-        slide_type = request.form.get('slide_type', 'file')
+        slide_type = request.form.get('slide_type', 'link')
         order = len(week.slides)
 
         if slide_type == 'link':

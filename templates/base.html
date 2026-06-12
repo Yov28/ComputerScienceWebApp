@@ -180,6 +180,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <a href="{{ url_for('teacher.dashboard') }}" class="nav-link {% if request.endpoint and 'dashboard' in request.endpoint %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('teacher.students') }}" class="nav-link {% if request.endpoint and 'student' in request.endpoint %}active{% endif %}">Students</a>
       <a href="{{ url_for('teacher.weeks') }}" class="nav-link {% if request.endpoint and 'week' in request.endpoint %}active{% endif %}">Weeks</a>
+      <a href="{{ url_for('teacher.marking_queue') }}" class="nav-link {% if request.endpoint and 'marking' in request.endpoint %}active{% endif %}">Marking</a>
+      <a href="{{ url_for('teacher.submissions') }}" class="nav-link {% if request.endpoint and 'submission' in request.endpoint %}active{% endif %}">Submissions</a>
     {% else %}
       <span class="nav-tag student">Student</span>
       <a href="{{ url_for('student.home') }}" class="nav-link {% if request.endpoint == 'student.home' %}active{% endif %}">Home</a>

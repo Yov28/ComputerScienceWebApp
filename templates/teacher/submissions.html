@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Student Submissions{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-header">
+    <h1>Student Submissions</h1>
+    <p>Work uploaded by students. Open the file, then leave a grade and feedback.</p>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if submissions %}
+    {% for sub in submissions %}
+    <div class="card" style="margin-bottom:14px; border-left:3px solid {% if sub.reviewed_at %}var(--accent){% else %}var(--amber){% endif %};">
+      <div style="display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+        <span style="font-size:28px;">📎</span>
+        <div style="flex:1; min-width:240px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+            <span style="font-size:15px; font-weight:600;">{{ sub.title or sub.file_name }}</span>
+            {% if sub.reviewed_at %}<span class="badge badge-green">Reviewed</span>{% else %}<span class="badge badge-amber">New</span>{% endif %}
+          </div>
+          <div style="font-size:12px; color:var(--text-faint); margin-bottom:6px;">
+            {{ sub.user.full_name }} · {{ sub.week.title }} · {{ sub.file_format | upper }} · {{ sub.submitted_at.strftime('%d %b %Y, %H:%M') }}
+          </div>
+          {% if sub.comment %}
+            <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">💬 Student note: {{ sub.comment }}</div>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('teacher.review_submission', sub_id=sub.id) }}">
+            <div class="form-row" style="margin-bottom:10px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Grade</label>
+                <input class="form-input" type="text" name="grade" value="{{ sub.grade or '' }}" placeholder="e.g. 8/10, Merit, Excellent">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:10px;">
+              <label class="form-label">Feedback</label>
+              <textarea class="form-textarea" name="feedback" rows="2" placeholder="Feedback the student will see...">{{ sub.teacher_feedback or '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save feedback</button>
+          </form>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <a href="{{ sub.file_url }}" target="_blank" class="btn btn-secondary btn-sm">Open file ↗</a>
+          <form method="POST" action="{{ url_for('teacher.delete_submission', sub_id=sub.id) }}" onsubmit="return confirm('Delete this submission?')">
+            <button type="submit" class="btn btn-danger btn-sm" style="width:100%;">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <h3>No submissions yet</h3>
+      <p>When students upload work from a week's page, it appears here.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

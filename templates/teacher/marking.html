@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Marking Queue{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-header">
+    <h1>Marking Queue</h1>
+    <p>Written answers waiting for your verdict. Marking correct adds +1 to the student's score.</p>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if pending %}
+    {% for ans in pending %}
+    <div class="card" style="margin-bottom:14px; border-left:3px solid var(--amber);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+        <span class="badge badge-blue">{{ ans.attempt.user.full_name }}</span>
+        <span class="badge badge-gray">{{ ans.attempt.week.title }}</span>
+        <span style="font-size:12px; color:var(--text-faint);">{{ ans.answered_at.strftime('%d %b %Y, %H:%M') }}</span>
+      </div>
+      <div style="font-size:14px; font-weight:600; margin-bottom:8px;">{{ ans.question.text }}</div>
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; font-size:13px; white-space:pre-wrap; margin-bottom:10px;">{{ ans.text_answer }}</div>
+      {% if ans.question.model_answer %}
+        <div style="font-size:12px; color:var(--text-faint); margin-bottom:12px;">📋 Model answer: {{ ans.question.model_answer }}</div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('teacher.mark_answer', answer_id=ans.id) }}">
+        <div class="form-group" style="margin-bottom:12px;">
+          <textarea class="form-textarea" name="feedback" rows="2" placeholder="Feedback for the student (optional)"></textarea>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="submit" name="verdict" value="correct" class="btn btn-primary btn-sm">✓ Correct (+1)</button>
+          <button type="submit" name="verdict" value="incorrect" class="btn btn-danger btn-sm">✗ Incorrect</button>
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <h3>All caught up! 🎉</h3>
+      <p>No written answers waiting to be marked.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
