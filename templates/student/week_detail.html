@@ -123,13 +123,17 @@
             <div style="margin-top:8px; padding:10px 12px; background:var(--accent-dim); border:1px solid rgba(74,222,128,0.2); border-radius:var(--radius-sm);">
               {% if sub.grade %}<div style="font-size:13px; font-weight:600; color:var(--accent); margin-bottom:4px;">Grade: {{ sub.grade }}</div>{% endif %}
               {% if sub.teacher_feedback %}<div style="font-size:13px; color:var(--text-muted);">{{ sub.teacher_feedback }}</div>{% endif %}
-              {% if sub.feedback_file_url %}<div style="margin-top:8px;"><a href="{{ sub.feedback_file_url }}" target="_blank" class="btn btn-secondary btn-sm">📎 Download teacher's feedback file ↗</a></div>{% endif %}
             </div>
           {% else %}
             <span class="badge badge-amber" style="margin-top:6px; display:inline-block;">Awaiting review</span>
           {% endif %}
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <a href="{{ sub.file_url }}" target="_blank" class="btn btn-secondary btn-sm">📄 View my file ↗</a>
+            {% if sub.feedback_file_url %}
+              <a href="{{ sub.feedback_file_url }}" target="_blank" class="btn btn-primary btn-sm">📝 View teacher's feedback file ↗</a>
+            {% endif %}
+          </div>
         </div>
-        <a href="{{ sub.file_url }}" target="_blank" class="btn btn-secondary btn-sm">View file ↗</a>
       </div>
     </div>
     {% endfor %}
