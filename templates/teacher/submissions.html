@@ -29,7 +29,7 @@
             <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">💬 Student note: {{ sub.comment }}</div>
           {% endif %}
 
-          <form method="POST" action="{{ url_for('teacher.review_submission', sub_id=sub.id) }}">
+          <form method="POST" action="{{ url_for('teacher.review_submission', sub_id=sub.id) }}" enctype="multipart/form-data">
             <div class="form-row" style="margin-bottom:10px;">
               <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label">Grade</label>
@@ -39,6 +39,14 @@
             <div class="form-group" style="margin-bottom:10px;">
               <label class="form-label">Feedback</label>
               <textarea class="form-textarea" name="feedback" rows="2" placeholder="Feedback the student will see...">{{ sub.teacher_feedback or '' }}</textarea>
+            </div>
+            <div class="form-group" style="margin-bottom:10px;">
+              <label class="form-label">Attach a marked-up / feedback file (optional)</label>
+              <input class="form-input" type="file" name="feedback_file" style="padding:8px;"
+                     accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.zip">
+              {% if sub.feedback_file_url %}
+                <p class="form-hint">Current: <a href="{{ sub.feedback_file_url }}" target="_blank">{{ sub.feedback_file_name or 'feedback file' }} ↗</a> — uploading a new one replaces it.</p>
+              {% endif %}
             </div>
             <button type="submit" class="btn btn-primary btn-sm">Save feedback</button>
           </form>

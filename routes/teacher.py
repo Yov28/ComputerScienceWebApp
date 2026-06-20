@@ -137,6 +137,28 @@ def review_submission(sub_id):
     sub = Submission.query.get_or_404(sub_id)
     sub.teacher_feedback = request.form.get('feedback', '').strip()
     sub.grade = request.form.get('grade', '').strip()
+
+    fb_file = request.files.get('feedback_file')
+    if fb_file and fb_file.filename:
+        ext = fb_file.filename.rsplit('.', 1)[1].lower() if '.' in fb_file.filename else ''
+        is_doc = ext in {'doc','docx','ppt','pptx','xls','xlsx','txt','csv','py','zip','md'}
+        try:
+            result = cloudinary.uploader.upload(
+                fb_file,
+                resource_type='raw' if is_doc else 'auto',
+                folder=f'gcse-quiz/feedback/{sub.week.slug}',
+                public_id=f'fb_{sub.id}_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}_{secure_filename(fb_file.filename)}',
+                use_filename=False,
+            )
+            sub.feedback_file_url = result.get('secure_url')
+            sub.feedback_file_name = fb_file.filename
+        except Exception as e:
+            print('CLOUDINARY FEEDBACK UPLOAD ERROR:', e)
+            flash(f'Feedback saved, but the file upload failed: {e}', 'error')
+            sub.reviewed_at = datetime.utcnow()
+            db.session.commit()
+            return redirect(request.referrer or url_for('teacher.submissions'))
+
     sub.reviewed_at = datetime.utcnow()
     db.session.commit()
     flash('Feedback saved.', 'success')
@@ -260,6 +282,17 @@ def toggle_week(slug):
     flash(f'{week.title} {status} for students.', 'success')
     return redirect(url_for('teacher.week_detail', slug=slug))
 
+@teacher_bp.route('/weeks/<slug>/toggle-submissions', methods=['POST'])
+@login_required
+@teacher_required
+def toggle_submissions(slug):
+    week = Week.query.filter_by(slug=slug).first_or_404()
+    week.allow_submissions = not week.allow_submissions
+    db.session.commit()
+    status = 'enabled' if week.allow_submissions else 'disabled'
+    flash(f'Work submissions {status} for {week.title}.', 'success')
+    return redirect(url_for('teacher.week_detail', slug=slug))
+
 @teacher_bp.route('/weeks/<slug>/edit', methods=['GET', 'POST'])
 @login_required
 @teacher_required
@@ -269,6 +302,15 @@ def edit_week(slug):
         week.title = request.form.get('title', week.title).strip()
         week.description = request.form.get('description', week.description).strip()
         week.teacher_notes = request.form.get('teacher_notes', '').strip()
+        # Week number (the intro quiz stays fixed at 0)
+        if not week.is_intro:
+            raw_num = request.form.get('week_number', '').strip()
+            if raw_num:
+                try:
+                    week.week_number = int(raw_num)
+                except ValueError:
+                    flash('Week number must be a whole number.', 'error')
+                    return render_template('teacher/edit_week.html', week=week)
         db.session.commit()
         flash('Week updated.', 'success')
         return redirect(url_for('teacher.week_detail', slug=slug))

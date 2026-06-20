@@ -4,12 +4,26 @@
 <div class="wrap" style="max-width:580px;">
   <a href="{{ url_for('teacher.week_detail', slug=week.slug) }}" class="back-link">← {{ week.title }}</a>
   <div class="page-header"><h1>Edit Week Details</h1></div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
   <div class="card" style="padding:28px;">
     <form method="POST">
       <div class="form-group">
         <label class="form-label required">Title</label>
         <input class="form-input" type="text" name="title" value="{{ week.title }}" required>
       </div>
+
+      {% if not week.is_intro %}
+      <div class="form-group">
+        <label class="form-label">Week number</label>
+        <input class="form-input" type="number" name="week_number" value="{{ week.week_number }}" min="1" step="1" style="max-width:140px;">
+        <p class="form-hint">Controls the order weeks appear in. Two weeks can share a number, but a unique order is clearer.</p>
+      </div>
+      {% endif %}
+
       <div class="form-group">
         <label class="form-label">Description</label>
         <textarea class="form-textarea" name="description" rows="2">{{ week.description or '' }}</textarea>

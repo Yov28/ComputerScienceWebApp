@@ -25,6 +25,7 @@ class Week(db.Model):
     week_number = db.Column(db.Integer, nullable=False)
     is_enabled = db.Column(db.Boolean, default=False)
     is_intro = db.Column(db.Boolean, default=False)
+    allow_submissions = db.Column(db.Boolean, default=True)
     teacher_notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     questions = db.relationship('Question', backref='week', lazy=True, cascade='all, delete-orphan', order_by='Question.order')

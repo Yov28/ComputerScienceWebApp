@@ -65,7 +65,7 @@ def week_detail(slug):
 @student_required
 def submit_work(slug):
     week = Week.query.filter_by(slug=slug).first_or_404()
-    if not week.is_enabled:
+    if not week.is_enabled or not week.allow_submissions:
         abort(403)
 
     file = request.files.get('file')

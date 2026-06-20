@@ -25,6 +25,11 @@
           {% if week.is_enabled %}🔒 Disable for students{% else %}🔓 Enable for students{% endif %}
         </button>
       </form>
+      <form method="POST" action="{{ url_for('teacher.toggle_submissions', slug=week.slug) }}">
+        <button type="submit" class="btn {% if week.allow_submissions %}btn-danger{% else %}btn-amber{% endif %} btn-sm">
+          {% if week.allow_submissions %}📥 Submissions ON — turn off{% else %}📥 Submissions OFF — turn on{% endif %}
+        </button>
+      </form>
       <a href="{{ url_for('teacher.edit_week', slug=week.slug) }}" class="btn btn-secondary btn-sm">✏️ Edit details</a>
     </div>
   </div>
