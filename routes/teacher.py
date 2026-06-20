@@ -152,10 +152,12 @@ def review_submission(sub_id):
                 public_id=f'fb_{sub.id}_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}_{secure_filename(fb_file.filename)}',
                 use_filename=False,
             )
-            sub.feedback_file_url = result.get('secure_url')
+            print('CLOUDINARY FEEDBACK RESULT:', {k: result.get(k) for k in ('secure_url','url','public_id','resource_type')})
+            sub.feedback_file_url = result.get('secure_url') or result.get('url')
             sub.feedback_file_name = fb_file.filename
+            print('SAVED feedback_file_url =', sub.feedback_file_url)
         except Exception as e:
-            print('CLOUDINARY FEEDBACK UPLOAD ERROR:', e)
+            print('CLOUDINARY FEEDBACK UPLOAD ERROR:', repr(e))
             flash(f'Feedback saved, but the file upload failed: {e}', 'error')
             sub.reviewed_at = datetime.utcnow()
             db.session.commit()
