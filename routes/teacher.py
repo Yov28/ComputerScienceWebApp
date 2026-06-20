@@ -135,6 +135,8 @@ def submissions():
 @teacher_required
 def review_submission(sub_id):
     sub = Submission.query.get_or_404(sub_id)
+    print('REVIEW DEBUG — files received:', list(request.files.keys()),
+          '| feedback_file filename:', request.files.get('feedback_file').filename if request.files.get('feedback_file') else 'NONE')
     sub.teacher_feedback = request.form.get('feedback', '').strip()
     sub.grade = request.form.get('grade', '').strip()
 
