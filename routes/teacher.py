@@ -8,9 +8,21 @@ from functools import wraps
 from datetime import datetime
 import os
 
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True,
+)
+
 teacher_bp = Blueprint('teacher', __name__)
 
-ALLOWED_EXTENSIONS = {'pdf', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'pdf', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'gif',
+                      'doc', 'docx', 'xlsx', 'xls', 'txt', 'csv'}
+IMAGE_EXTS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def teacher_required(f):
     @wraps(f)
@@ -388,17 +400,25 @@ def add_slide(slug):
         else:
             file = request.files.get('file')
             if not file or not allowed_file(file.filename):
-                flash('Please upload a valid file (PDF, PPTX, PNG, JPG).', 'error')
+                flash('Please upload a valid file (PDF, Word, PowerPoint, Excel, image, or text).', 'error')
             else:
-                filename = secure_filename(file.filename)
-                timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-                filename = f"{timestamp}_{filename}"
-                save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                file.save(save_path)
-                ext = filename.rsplit('.', 1)[1].lower()
-                file_type = 'image' if ext in {'png','jpg','jpeg','gif'} else ext
-                slide = Slide(week_id=week.id, title=title, filename=filename,
-                              file_type=file_type, order=order)
+                ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                file_type = 'image' if ext in IMAGE_EXTS else ext
+                try:
+                    result = cloudinary.uploader.upload(
+                        file,
+                        resource_type='auto',
+                        folder=f'gcse-quiz/resources/{week.slug}',
+                        public_id=f'res_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}',
+                        use_filename=False,
+                    )
+                except Exception as e:
+                    print('CLOUDINARY RESOURCE UPLOAD ERROR:', e)
+                    flash(f'Upload failed: {e}', 'error')
+                    return redirect(url_for('teacher.add_slide', slug=slug))
+                slide = Slide(week_id=week.id, title=title or file.filename,
+                              filename=file.filename, file_type=file_type,
+                              cloud_url=result.get('secure_url'), order=order)
                 db.session.add(slide)
                 db.session.commit()
                 flash('File uploaded.', 'success')
@@ -411,7 +431,8 @@ def add_slide(slug):
 def delete_slide(slide_id):
     slide = Slide.query.get_or_404(slide_id)
     slug = slide.week.slug
-    if slide.filename:
+    # Remove any legacy local file (older uploads saved to disk)
+    if slide.filename and not slide.cloud_url:
         path = os.path.join(current_app.config['UPLOAD_FOLDER'], slide.filename)
         if os.path.exists(path):
             os.remove(path)

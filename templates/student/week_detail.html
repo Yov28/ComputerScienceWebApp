@@ -23,8 +23,9 @@
     {% if slides %}
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px;">
         {% for slide in slides %}
+        {% set slide_src = slide.url or slide.cloud_url or (url_for('static', filename='uploads/' + slide.filename) if slide.filename else '#') %}
         <div class="card" style="padding:18px; cursor:pointer;"
-             onclick="openFile('{{ slide.file_type }}', '{% if slide.url %}{{ slide.url }}{% else %}{{ url_for('static', filename='uploads/' + slide.filename) }}{% endif %}', '{{ (slide.title or slide.filename or 'Resource') | replace("'", " ") }}')">
+             onclick="openFile('{{ slide.file_type }}', '{{ slide_src }}', '{{ (slide.title or slide.filename or 'Resource') | replace("'", " ") }}')">
           <div style="font-size:34px; margin-bottom:10px;">
             {% if slide.file_type == 'pdf' %}📄{% elif slide.file_type in ['pptx','ppt'] %}📊{% elif slide.file_type == 'image' %}🖼️{% else %}🔗{% endif %}
           </div>

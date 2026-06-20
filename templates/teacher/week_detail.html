@@ -90,10 +90,9 @@
         <div style="font-size:14px; font-weight:500;">{{ slide.title or 'Untitled' }}</div>
         <div style="font-size:11px; color:var(--text-faint);">{{ slide.file_type | upper }} · {{ slide.uploaded_at.strftime('%d %b %Y') }}</div>
       </div>
-      {% if slide.url %}
-        <a href="{{ slide.url }}" target="_blank" class="btn btn-secondary btn-sm">Preview ↗</a>
-      {% elif slide.filename %}
-        <a href="{{ url_for('static', filename='uploads/' + slide.filename) }}" target="_blank" class="btn btn-secondary btn-sm">Preview</a>
+      {% set slide_src = slide.url or slide.cloud_url or (url_for('static', filename='uploads/' + slide.filename) if slide.filename else None) %}
+      {% if slide_src %}
+        <a href="{{ slide_src }}" target="_blank" class="btn btn-secondary btn-sm">Preview ↗</a>
       {% endif %}
       <form method="POST" action="{{ url_for('teacher.delete_slide', slide_id=slide.id) }}" onsubmit="return confirm('Delete this resource?')">
         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
