@@ -88,16 +88,19 @@ def submit_work(slug):
         flash(f'File is too large ({size_mb:.1f} MB). Maximum is {MAX_SUBMISSION_MB} MB.', 'error')
         return redirect(url_for('student.week_detail', slug=slug))
 
+    from werkzeug.utils import secure_filename
+    is_doc = ext in {'doc','docx','ppt','pptx','xls','xlsx','txt','csv','py','zip','md'}
     try:
         result = cloudinary.uploader.upload(
             file,
-            resource_type='auto',
+            resource_type='raw' if is_doc else 'auto',
             folder=f'gcse-quiz/submissions/{week.slug}',
-            public_id=f'u{current_user.id}_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}',
+            public_id=f'u{current_user.id}_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}_{secure_filename(file.filename)}',
             use_filename=False,
         )
     except Exception as e:
-        flash('Upload failed. Please try again or tell your teacher.', 'error')
+        print('CLOUDINARY SUBMISSION UPLOAD ERROR:', e)
+        flash(f'Upload failed: {e}', 'error')
         return redirect(url_for('student.week_detail', slug=slug))
 
     sub = Submission(
