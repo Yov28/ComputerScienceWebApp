@@ -404,12 +404,13 @@ def add_slide(slug):
             else:
                 ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
                 file_type = 'image' if ext in IMAGE_EXTS else ext
+                is_doc = ext in {'doc','docx','ppt','pptx','xls','xlsx','txt','csv'}
                 try:
                     result = cloudinary.uploader.upload(
                         file,
-                        resource_type='auto',
+                        resource_type='raw' if is_doc else 'auto',
                         folder=f'gcse-quiz/resources/{week.slug}',
-                        public_id=f'res_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}',
+                        public_id=f'res_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}_{secure_filename(file.filename)}',
                         use_filename=False,
                     )
                 except Exception as e:
