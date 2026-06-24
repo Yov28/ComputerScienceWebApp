@@ -112,4 +112,6 @@ class Submission(db.Model):
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     teacher_feedback = db.Column(db.Text)
     grade = db.Column(db.String(50))
+    feedback_file_url = db.Column(db.String(600))
+    feedback_file_name = db.Column(db.String(300))
     reviewed_at = db.Column(db.DateTime)

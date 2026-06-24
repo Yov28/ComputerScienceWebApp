@@ -135,8 +135,6 @@ def submissions():
 @teacher_required
 def review_submission(sub_id):
     sub = Submission.query.get_or_404(sub_id)
-    print('REVIEW DEBUG — files received:', list(request.files.keys()),
-          '| feedback_file filename:', request.files.get('feedback_file').filename if request.files.get('feedback_file') else 'NONE')
     sub.teacher_feedback = request.form.get('feedback', '').strip()
     sub.grade = request.form.get('grade', '').strip()
 
@@ -152,10 +150,8 @@ def review_submission(sub_id):
                 public_id=f'fb_{sub.id}_{datetime.utcnow().strftime("%Y%m%d%H%M%S")}_{secure_filename(fb_file.filename)}',
                 use_filename=False,
             )
-            print('CLOUDINARY FEEDBACK RESULT:', {k: result.get(k) for k in ('secure_url','url','public_id','resource_type')})
             sub.feedback_file_url = result.get('secure_url') or result.get('url')
             sub.feedback_file_name = fb_file.filename
-            print('SAVED feedback_file_url =', sub.feedback_file_url)
         except Exception as e:
             print('CLOUDINARY FEEDBACK UPLOAD ERROR:', repr(e))
             flash(f'Feedback saved, but the file upload failed: {e}', 'error')
